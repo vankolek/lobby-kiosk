@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lobby Information Kiosk</title>
+    <style>
+        /* --- BASE SETTINGS FOR 32" SCREEN --- */
+        :root {
+            --primary: #0056b3;
+            --bg-color: #f4f7f6;
+            --text-main: #333333;
+        }
+        
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            overflow: hidden; /* Prevents scrollbars on kiosks */
+            user-select: none; /* Prevents text highlighting when tapping */
+        }
+
+        /* --- 1. THE SCREENSAVER (VIDEO BACKGROUND) --- */
+        #screensaver {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s ease;
+            background-color: black; /* Failsafe background */
+        }
+
+        #bg-video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Stretches the video perfectly without distorting */
+            opacity: 0.6; /* Dims the video slightly so the text is easier to read */
+        }
+
+        .screensaver-text {
+            position: relative;
+            z-index: 2; /* Keeps the text floating above the video */
+            text-align: center;
+            color: white;
+            text-shadow: 2px 2px 15px rgba(0,0,0,0.8); /* Dark shadow for readability */
+        }
+
+        .screensaver-text h1 {
+            font-size: 6rem;
+            margin: 0;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* --- 2. MAIN DASHBOARD --- */
+        #main-ui {
+            padding: 40px;
+            height: 100%;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        header h1 {
+            font-size: 4rem;
+            color: var(--primary);
+            margin: 0;
+        }
+
+        /* Big, touch-friendly grid */
+        .button-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            flex-grow: 1;
+        }
+
+        .kiosk-btn {
+            background-color: white;
+            border: 4px solid #e0e0e0;
+            border-radius: 20px;
+            font-size: 3rem;
+            font-weight: bold;
+            color: var(--text-main);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.1s, background-color 0.2s;
+        }
+
+        .kiosk-btn:active {
+            transform: scale(0.95);
+            background-color: #f0f0f0;
+        }
+
+        .btn-donate {
+            background-color: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* --- 3. POPUP MODAL --- */
+        #modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-box {
+            background: white;
+            padding: 60px;
+            border-radius: 20px;
+            text-align: center;
+            width: 60%;
+            font-size: 2.5rem;
+        }
+
+        .close-btn {
+            margin-top: 40px;
+            padding: 20px 60px;
+            font-size: 2rem;
+            background: #cc0000;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body onclick="resetIdleTimer()">
+
+    <div id="screensaver" onclick="hideScreensaver()">
+        
+        <video autoplay muted loop playsinline id="bg-video">
+            <source src="background.mp4" type="video/mp4">
+        </video>
+
+        <div class="screensaver-text">
+            <h1>Welcome to Our Center</h1>
+            <p style="font-size: 3rem;">Touch Anywhere to Begin</p>
+        </div>
+
+    </div>
+
+    <div id="main-ui">
+        <header>
+            <h1>Information Directory</h1>
+            <p style="font-size: 2rem; color: #666;">Please select an option below</p>
+        </header>
+
+        <div class="button-grid">
+            <button class="kiosk-btn" onclick="openModal('Today\'s Events', '10:00 AM - Morning Welcome<br>1:00 PM - Community Lunch')">Today's Events</button>
+            <button class="kiosk-btn" onclick="openModal('Facility Map', 'Scan the QR code below to view the map on your phone.')">Facility Map</button>
+            <button class="kiosk-btn" onclick="openModal('Our Mission', 'We strive to support and uplift our community every day.')">Our Mission</button>
+            <button class="kiosk-btn btn-donate" onclick="openModal('Support Us', 'Please tap your card on the Square Terminal below to donate.<br><br><b>$20.00</b>')">Quick Donate</button>
+        </div>
+    </div>
+
+    <div id="modal-overlay">
+        <div class="modal-box">
+            <h2 id="modal-title" style="color: var(--primary); font-size: 4rem; margin-top:0;">Title</h2>
+            <p id="modal-content">Content goes here...</p>
+            <button class="close-btn" onclick="closeModal()">Close / Go Back</button>
+        </div>
+    </div>
+
+    <script>
+        // --- KIOSK LOGIC ---
+
+        let idleTimer;
+        // Set this to 60000 for 1 minute in the real world. Left at 15s for easy testing!
+        const IDLE_TIMEOUT_MS = 15000; 
+
+        function hideScreensaver() {
+            document.getElementById('screensaver').style.display = 'none';
+            resetIdleTimer();
+        }
+
+        function showScreensaver() {
+            document.getElementById('screensaver').style.display = 'flex';
+            closeModal(); // Ensure popup windows close if someone walks away
+        }
+
+        function resetIdleTimer() {
+            clearTimeout(idleTimer);
+            // Only start the countdown if the screensaver is currently hidden
+            if (document.getElementById('screensaver').style.display === 'none') {
+                idleTimer = setTimeout(showScreensaver, IDLE_TIMEOUT_MS);
+            }
+        }
+
+        function openModal(title, content) {
+            document.getElementById('modal-title').innerHTML = title;
+            document.getElementById('modal-content').innerHTML = content;
+            document.getElementById('modal-overlay').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('modal-overlay').style.display = 'none';
+        }
+
+        // Initialize the timer on first load
+        resetIdleTimer();
+    </script>
+</body>
+</html>
